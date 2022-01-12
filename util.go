@@ -1,4 +1,4 @@
-package main
+package gitacthelp
 
 import (
 	log "github.com/sirupsen/logrus"
