@@ -1,4 +1,4 @@
-module gitacthelp
+module github.com/devindi/gitacthelp
 
 go 1.17
 
