@@ -3,8 +3,10 @@ package jira
 import (
 	"errors"
 	"fmt"
-	"gitacthelp/atlassian"
 	"github.com/andygrunwald/go-jira"
+	"github.com/devindi/gitacthelp/atlassian"
+	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"time"
 )
 
@@ -15,6 +17,49 @@ type Issue struct {
 	Status     string
 	FixVersion *string
 	ResolvedAt *time.Time
+}
+
+func (clnt JiraClient) CreateReleaseTask(summary string, description string, reporterId string) (*string, error) {
+	meta, _, err := clnt.client.Issue.GetCreateMeta(clnt.projectKey)
+	if err != nil {
+		log.Errorln("Failed to get jira metadata")
+		return nil, err
+	}
+
+	var releaseIssueType *jira.MetaIssueType
+	for _, issueType := range meta.Projects[0].IssueTypes {
+		if issueType.Name == "Release" {
+			releaseIssueType = issueType
+		}
+	}
+
+	issue, resp, err := clnt.client.Issue.Create(&jira.Issue{
+		Fields: &jira.IssueFields{
+			Project: jira.Project{
+				Key: clnt.projectKey,
+			},
+			Type: jira.IssueType{
+				ID: releaseIssueType.Id,
+			},
+			Summary:     summary,
+			Description: description,
+			Reporter: &jira.User{
+				AccountID: reporterId,
+			},
+		},
+	})
+	if err != nil {
+		defer resp.Body.Close()
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+		bodyString := string(bodyBytes)
+		log.Errorln("Failed to create issue. Response: ", bodyString)
+		return nil, err
+	}
+
+	return &issue.Key, nil
 }
 
 func (issue Issue) GetUrl(config atlassian.AtlassianConfig) string {

@@ -20,6 +20,29 @@ func (branch GithubBranch) GetUrl(config GithubConfig) string {
 	return fmt.Sprintf("<https://github.com/%s/%s/tree/%s|%s>", config.Owner, config.Repository, branch.Name, branch.Name)
 }
 
+func (client GithubClient) CreateBranch(base string, name string) (*string, error) {
+	originBranchRef, _, err := client.impl.Git.GetRef(client.context, client.owner, client.repository, fmt.Sprintf("heads/%s", base))
+	if err != nil {
+		log.Errorln("Failed to get base branch")
+		return nil, err
+	}
+
+	lastCommitSha := originBranchRef.Object.SHA
+	log.WithField("commit", *lastCommitSha).Println("Creating release branch on commit")
+
+	_, _, err = client.impl.Git.CreateRef(client.context, client.owner, client.repository, &github.Reference{
+		Ref: github.String(fmt.Sprintf("refs/heads/%s", name)),
+		Object: &github.GitObject{
+			SHA: lastCommitSha,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	branchUrl := fmt.Sprintf("https://github.com/%s/%s/tree/%s", client.owner, client.repository, name)
+	return &branchUrl, nil
+}
+
 func (client GithubClient) GetBranches() ([]GithubBranch, error) {
 	branchOpt := github.ListOptions{PerPage: 150}
 	branches, _, err := client.impl.Repositories.ListBranches(client.context, client.owner, client.repository, &branchOpt)

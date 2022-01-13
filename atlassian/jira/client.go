@@ -1,8 +1,8 @@
 package jira
 
 import (
-	"gitacthelp/atlassian"
 	"github.com/andygrunwald/go-jira"
+	"github.com/devindi/gitacthelp/atlassian"
 )
 
 type JiraClient struct {
