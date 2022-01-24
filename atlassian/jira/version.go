@@ -11,6 +11,24 @@ type JiraRelease struct {
 	Id   int
 }
 
+func (clnt JiraClient) Version(name string) (*JiraRelease, error) {
+	var project, _, err = clnt.client.Project.Get(clnt.projectKey)
+	if err != nil {
+		log.Errorln("Failed to find project: ", clnt.projectKey)
+		return nil, err
+	}
+	for _, version := range project.Versions {
+		if version.Name == name {
+			versionId, _ := strconv.Atoi(version.ID)
+			return &JiraRelease{
+				Name: version.Name,
+				Id:   versionId,
+			}, nil
+		}
+	}
+	return nil, nil
+}
+
 func (clnt JiraClient) CreateRelease(name string) (*JiraRelease, error) {
 	var project, _, err = clnt.client.Project.Get(clnt.projectKey)
 	if err != nil {
@@ -66,4 +84,14 @@ func (clnt JiraClient) RenameRelease(oldName string, newName string) (*JiraRelea
 		Name: newName,
 		Id:   versionId,
 	}, nil
+}
+
+func (clnt JiraClient) ReleaseVersion(id int) error {
+	version, _, err := clnt.client.Version.Get(id)
+	if err != nil {
+		return err
+	}
+	version.Released = jira.Bool(true)
+	_, _, err = clnt.client.Version.Update(version)
+	return err
 }

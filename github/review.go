@@ -20,6 +20,22 @@ type IssueTimelineItem struct {
 	Event     *string `json:"event"`
 }
 
+func (client GithubClient) CreateReview(sourceBranch string, targetBranch string, title string, description string) (*GithubReview, error) {
+	pr, _, err := client.impl.PullRequests.Create(client.context, client.owner, client.repository, &github.NewPullRequest{
+		Title:               github.String(title),
+		Head:                github.String(sourceBranch),
+		Base:                github.String(targetBranch),
+		Body:                github.String(description),
+		MaintainerCanModify: github.Bool(true),
+		Draft:               github.Bool(false),
+	})
+	if err != nil {
+		return nil, err
+	}
+	review := client.expandPullRequest(*pr)
+	return &review, nil
+}
+
 func (client GithubClient) GetReviews() ([]GithubReview, error) {
 	pullRequestOpt := github.PullRequestListOptions{ListOptions: github.ListOptions{PerPage: 100}}
 	pullRequests, _, err := client.impl.PullRequests.List(client.context, client.owner, client.repository, &pullRequestOpt)
@@ -29,23 +45,27 @@ func (client GithubClient) GetReviews() ([]GithubReview, error) {
 	}
 	var result []GithubReview
 	for _, pullRequest := range pullRequests {
-		var reviewers []string
-		for _, reviewer := range pullRequest.RequestedReviewers {
-			reviewers = append(reviewers, reviewer.GetLogin())
-		}
-		var timestamp = client.tryToFetchRequestDate(*pullRequest.Number)
-		if timestamp == nil {
-			timestamp = pullRequest.CreatedAt
-		}
-		result = append(result, GithubReview{
-			ID:                 *pullRequest.Number,
-			Title:              pullRequest.GetTitle(),
-			Author:             pullRequest.GetUser().GetLogin(),
-			RequestedReviewers: reviewers,
-			CreatedAt:          timestamp,
-		})
+		result = append(result, client.expandPullRequest(*pullRequest))
 	}
 	return result, nil
+}
+
+func (client GithubClient) expandPullRequest(pullRequest github.PullRequest) GithubReview {
+	var reviewers []string
+	for _, reviewer := range pullRequest.RequestedReviewers {
+		reviewers = append(reviewers, reviewer.GetLogin())
+	}
+	var timestamp = client.tryToFetchRequestDate(*pullRequest.Number)
+	if timestamp == nil {
+		timestamp = pullRequest.CreatedAt
+	}
+	return GithubReview{
+		ID:                 *pullRequest.Number,
+		Title:              pullRequest.GetTitle(),
+		Author:             pullRequest.GetUser().GetLogin(),
+		RequestedReviewers: reviewers,
+		CreatedAt:          timestamp,
+	}
 }
 
 //Beware. We are using experimental API here

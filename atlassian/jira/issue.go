@@ -96,6 +96,36 @@ func (clnt JiraClient) GetIssue(issueId string) (task *Issue, err error) {
 	}, nil
 }
 
+func (clnt JiraClient) SearchIssues(jql string) (issues []Issue, err error) {
+	rawIssues, _, err := clnt.client.Issue.Search(jql, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, issue := range rawIssues {
+		issues = append(issues, Issue{
+			Key:    issue.Key,
+			Title:  issue.Fields.Summary,
+			Type:   issue.Fields.Type.Name,
+			Status: issue.Fields.Status.Name,
+		})
+	}
+	return issues, nil
+}
+
+func (clnt JiraClient) TransitIssue(issueKey string, transitionId string) error {
+	//useful for debugging purposes
+	//transitions, _, _ := clnt.client.Issue.GetTransitions(key)
+	//for _, transition := range transitions {
+	//	log.Infof("Possible transition %s %s %s", transition.ID, transition.Name, transition.To)
+	//}
+	_, err := clnt.client.Issue.DoTransition(issueKey, "41") //from ready for release to released
+	return err
+}
+
+func (clnt JiraClient) GetIssuesFromRelease(releaseId int) (issues []Issue, err error) {
+	return clnt.SearchIssues(fmt.Sprintf("project = %s AND fixVersion = %d", clnt.projectKey, releaseId))
+}
+
 func findResolvedAt(issue jira.Issue) (*time.Time, error) {
 	if issue.Fields.Status.Name != "Resolved" {
 		return nil, nil
